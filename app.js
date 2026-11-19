@@ -179,7 +179,6 @@ function renderOrderModalList() {
     orderListContainer.appendChild(row);
   });
 
-  // Event saat dropdown diubah -> otomatis tukar posisi agar tidak ada duplikat
   orderListContainer.querySelectorAll('.order-select').forEach((select) => {
     select.addEventListener('change', (e) => {
       const targetIdx = parseInt(e.target.dataset.index, 10);
@@ -195,7 +194,6 @@ function renderOrderModalList() {
     });
   });
 
-  // Event saat tombol naik/turun diklik
   orderListContainer.querySelectorAll('.btn-move').forEach((btn) => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.index, 10);
@@ -248,7 +246,7 @@ function extractEntities(file) {
   const fileNameNoExt = file.name.replace(/\.pdf$/i, '');
   const normalized = fileNameNoExt.toLowerCase();
 
-  // 1. Deteksi Jenis File (posisi bebas: depan, tengah, maupun belakang nama file)
+  // 1. Deteksi Jenis File
   let docType = null;
   if (/(?:^|[^a-z])(invoice|inv)(?:[^a-z]|$)/i.test(normalized)) {
     docType = 'invoice';
@@ -262,7 +260,6 @@ function extractEntities(file) {
   let dealerCode = null;
   const numericTokens = fileNameNoExt.match(/\d{4,10}/g) || [];
 
-  // Saring angka berformat tanggal YYYYMMDD atau YYYYMM
   const nonDateTokens = numericTokens.filter((num) => {
     const isFullDate = num.length === 8 && /^20[23]\d(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/.test(num);
     const isYearMonth = num.length === 6 && /^20[23]\d(0[1-9]|1[0-2])$/.test(num);
@@ -271,12 +268,10 @@ function extractEntities(file) {
 
   const candidateTokens = nonDateTokens.length > 0 ? nonDateTokens : numericTokens;
 
-  // Prioritas kode dealer 5-8 digit
   const standardCode = candidateTokens.find((num) => num.length >= 5 && num.length <= 8);
   if (standardCode) {
     dealerCode = standardCode;
   } else {
-    // Fallback 4 digit non-tahun
     const nonYear4Digit = candidateTokens.find((num) => {
       const n = parseInt(num, 10);
       return num.length === 4 && (n < 2020 || n > 2035);
@@ -288,7 +283,7 @@ function extractEntities(file) {
     }
   }
 
-  // Fallback terakhir: cek nama folder induk jika kode dealer tidak tertulis di nama file
+  // Fallback: cek nama folder induk jika kode dealer tidak tertulis di nama file
   if (!dealerCode && file.webkitRelativePath) {
     const parts = file.webkitRelativePath.split('/');
     if (parts.length >= 2) {
@@ -351,12 +346,10 @@ function handleFiles(allFiles) {
     dealerMap.get(dealerCode).docs[docType].push(file);
   });
 
-  // Urutkan kode dealer secara numerik
   groupedDealers = Array.from(dealerMap.values()).sort((a, b) =>
     a.dealerCode.localeCompare(b.dealerCode, undefined, { numeric: true })
   );
 
-  // Susun status kelengkapan dan keterangan untuk setiap kode dealer
   groupedDealers.forEach((group) => {
     const missing = [];
     const notes = [];
@@ -392,7 +385,6 @@ function handleFiles(allFiles) {
     }
   });
 
-  // Perbarui statistik
   const completeCount = groupedDealers.filter((d) => d.isComplete).length;
   const incompleteCount = groupedDealers.length - completeCount;
 
@@ -454,7 +446,6 @@ function renderTable() {
 
     const badgeClass = group.isComplete ? 'status-complete' : 'status-incomplete';
 
-    // Kolom dokumen mengikuti tata letak yang dipilih di Pengaturan Urutan
     const firstDocType = docOrder[0];
     const secondDocType = docOrder[1];
     const thirdDocType = docOrder[2];
@@ -503,13 +494,11 @@ async function processAndDownloadZip() {
       progressLabel.textContent = `Menggabungkan ${group.outputFilename} (${i + 1}/${groupedDealers.length})...`;
       progressPercent.textContent = `${percent}%`;
 
-      // Beri jeda micro-task agar UI tetap responsif saat memproses batch besar (hingga 300 MB)
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       const mergedPdf = await PDFLib.PDFDocument.create();
       let mergedPageCount = 0;
 
-      // Gabungkan dokumen sesuai tata letak aktif dari Pengaturan Urutan
       for (const type of docOrder) {
         for (const file of group.docs[type]) {
           try {
@@ -548,7 +537,6 @@ async function processAndDownloadZip() {
       }
     }
 
-    // Sertakan file rekap CSV di dalam ZIP sebagai laporan keterangan
     zip.file('_Rekap_Keterangan_Gabung.csv', '\uFEFF' + summaryLines.join('\n'));
 
     progressLabel.textContent = 'Membuat arsip ZIP...';
