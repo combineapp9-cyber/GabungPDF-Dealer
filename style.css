@@ -41,7 +41,7 @@ body {
 }
 
 .container {
-  max-width: 1160px;
+  max-width: 1180px;
   margin: 0 auto;
 }
 
@@ -196,7 +196,7 @@ button:disabled {
   background: #ffffff;
   color: var(--navy);
   border: 1px solid var(--border-strong);
-  padding: 8px 14px;
+  padding: 9px 15px;
 }
 
 .btn-outline:hover:not(:disabled) {
@@ -226,6 +226,22 @@ button:disabled {
 
 .btn-link:hover {
   color: var(--primary-hover);
+}
+
+.btn-row-dl {
+  background: var(--bg-blue-tint);
+  color: var(--primary);
+  border: 1px solid #bfdbfe;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.btn-row-dl:hover:not(:disabled) {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
 }
 
 /* Toolbar */
@@ -261,6 +277,13 @@ button:disabled {
   border-radius: 6px;
   font-weight: 600;
   font-size: 0.82rem;
+}
+
+.output-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 /* Stats Grid */
@@ -490,6 +513,73 @@ tr:hover td {
 .log-warn { color: var(--warn-text); }
 .log-err { color: var(--danger-text); }
 .log-ok { color: var(--success-text); }
+
+/* Toast Pop-up Notifikasi */
+.toast-popup {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  background: #ffffff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid var(--primary);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 390px;
+  z-index: 1100;
+  animation: slideUpToast 0.2s ease-out;
+}
+
+@keyframes slideUpToast {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--success-bg);
+  color: var(--success-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-content strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--navy);
+  margin-bottom: 2px;
+}
+
+.toast-content p {
+  font-size: 0.81rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.toast-close:hover {
+  color: var(--text-main);
+}
 
 /* Modal Pengaturan */
 .modal-backdrop {
