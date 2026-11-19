@@ -1,11 +1,15 @@
-const MAX_SIZE_BYTES = 50 * 1024 * 1024; // Batas 50 MB
-const DOC_ORDER = ['invoice', 'email', 'report'];
+const MAX_SIZE_BYTES = 300 * 1024 * 1024; // Batas 300 MB
+const STORAGE_KEY_ORDER = 'combine_pdf_dealer_doc_order_v1';
+const DEFAULT_DOC_ORDER = ['invoice', 'email', 'report'];
+
 const DOC_LABELS = {
   invoice: 'Invoice',
   email: 'Email',
   report: 'Report'
 };
 
+let docOrder = loadSavedOrder();
+let draftDocOrder = [...docOrder];
 let groupedDealers = [];
 let currentFilter = 'all';
 let searchQuery = '';
@@ -18,8 +22,17 @@ const btnSelectFolder = document.getElementById('btnSelectFolder');
 const btnSelectFiles = document.getElementById('btnSelectFiles');
 const btnClear = document.getElementById('btnClear');
 const btnMerge = document.getElementById('btnMerge');
-const chkTagIncompleteFilename = document.getElementById('chkTagIncompleteFilename');
 const searchDealerInput = document.getElementById('searchDealerInput');
+
+const activeOrderBadge = document.getElementById('activeOrderBadge');
+const btnOpenSettings = document.getElementById('btnOpenSettings');
+const btnQuickEditOrder = document.getElementById('btnQuickEditOrder');
+const settingsModal = document.getElementById('settingsModal');
+const btnCloseSettings = document.getElementById('btnCloseSettings');
+const btnCancelSettings = document.getElementById('btnCancelSettings');
+const btnResetOrder = document.getElementById('btnResetOrder');
+const btnSaveSettings = document.getElementById('btnSaveSettings');
+const orderListContainer = document.getElementById('orderListContainer');
 
 const statsGrid = document.getElementById('statsGrid');
 const previewCard = document.getElementById('previewCard');
@@ -32,16 +45,14 @@ const progressFill = document.getElementById('progressFill');
 const progressLabel = document.getElementById('progressLabel');
 const progressPercent = document.getElementById('progressPercent');
 
-// Event Listeners
+// Inisialisasi tampilan urutan aktif saat halaman dimuat
+syncOrderUI();
+
+// Event Listeners Utama
 btnSelectFolder.addEventListener('click', () => folderInput.click());
 btnSelectFiles.addEventListener('click', () => filesInput.click());
 btnClear.addEventListener('click', resetApp);
 btnMerge.addEventListener('click', processAndDownloadZip);
-
-chkTagIncompleteFilename.addEventListener('change', () => {
-  updateOutputFilenames();
-  renderTable();
-});
 
 searchDealerInput.addEventListener('input', (e) => {
   searchQuery = e.target.value.trim().toLowerCase();
@@ -77,6 +88,130 @@ document.querySelectorAll('.pill').forEach((pill) => {
   });
 });
 
+// Event Listeners Modal Pengaturan Tata Letak
+btnOpenSettings.addEventListener('click', openSettingsModal);
+btnQuickEditOrder.addEventListener('click', openSettingsModal);
+btnCloseSettings.addEventListener('click', closeSettingsModal);
+btnCancelSettings.addEventListener('click', closeSettingsModal);
+
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) closeSettingsModal();
+});
+
+btnResetOrder.addEventListener('click', () => {
+  draftDocOrder = [...DEFAULT_DOC_ORDER];
+  renderOrderModalList();
+});
+
+btnSaveSettings.addEventListener('click', () => {
+  docOrder = [...draftDocOrder];
+  try {
+    localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(docOrder));
+  } catch (_) {
+    // Abaikan jika storage dibatasi
+  }
+  syncOrderUI();
+  renderTable();
+  closeSettingsModal();
+  addLog(`Tata letak halaman diperbarui: ${formatOrderText(docOrder)}`, 'ok');
+});
+
+function loadSavedOrder() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ORDER);
+    if (!raw) return [...DEFAULT_DOC_ORDER];
+    const parsed = JSON.parse(raw);
+    const isValid =
+      Array.isArray(parsed) &&
+      parsed.length === 3 &&
+      DEFAULT_DOC_ORDER.every((item) => parsed.includes(item));
+    return isValid ? parsed : [...DEFAULT_DOC_ORDER];
+  } catch (_) {
+    return [...DEFAULT_DOC_ORDER];
+  }
+}
+
+function formatOrderText(orderArr) {
+  return orderArr.map((key, idx) => `${idx + 1}. ${DOC_LABELS[key]}`).join(' → ');
+}
+
+function syncOrderUI() {
+  activeOrderBadge.textContent = formatOrderText(docOrder);
+  document.getElementById('colDoc1').textContent = `Hal. 1 • ${DOC_LABELS[docOrder[0]]}`;
+  document.getElementById('colDoc2').textContent = `Hal. 2 • ${DOC_LABELS[docOrder[1]]}`;
+  document.getElementById('colDoc3').textContent = `Hal. 3 • ${DOC_LABELS[docOrder[2]]}`;
+}
+
+function openSettingsModal() {
+  draftDocOrder = [...docOrder];
+  renderOrderModalList();
+  settingsModal.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add('hidden');
+}
+
+function renderOrderModalList() {
+  orderListContainer.innerHTML = '';
+
+  draftDocOrder.forEach((docKey, index) => {
+    const row = document.createElement('div');
+    row.className = 'order-item';
+
+    const optionsHtml = DEFAULT_DOC_ORDER.map(
+      (key) => `<option value="${key}" ${key === docKey ? 'selected' : ''}>${DOC_LABELS[key]}</option>`
+    ).join('');
+
+    row.innerHTML = `
+      <div class="order-item-left">
+        <span class="order-num">${index + 1}</span>
+        <select class="order-select" data-index="${index}" aria-label="Dokumen urutan ke-${index + 1}">
+          ${optionsHtml}
+        </select>
+      </div>
+      <div class="order-move-btns">
+        <button type="button" class="btn-move" data-dir="-1" data-index="${index}" ${index === 0 ? 'disabled' : ''} title="Geser ke atas">&#9650;</button>
+        <button type="button" class="btn-move" data-dir="1" data-index="${index}" ${index === draftDocOrder.length - 1 ? 'disabled' : ''} title="Geser ke bawah">&#9660;</button>
+      </div>
+    `;
+
+    orderListContainer.appendChild(row);
+  });
+
+  // Event saat dropdown diubah -> otomatis tukar posisi agar tidak ada duplikat
+  orderListContainer.querySelectorAll('.order-select').forEach((select) => {
+    select.addEventListener('change', (e) => {
+      const targetIdx = parseInt(e.target.dataset.index, 10);
+      const selectedType = e.target.value;
+      const existingIdx = draftDocOrder.indexOf(selectedType);
+
+      if (existingIdx !== -1 && existingIdx !== targetIdx) {
+        const temp = draftDocOrder[targetIdx];
+        draftDocOrder[targetIdx] = selectedType;
+        draftDocOrder[existingIdx] = temp;
+      }
+      renderOrderModalList();
+    });
+  });
+
+  // Event saat tombol naik/turun diklik
+  orderListContainer.querySelectorAll('.btn-move').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.index, 10);
+      const dir = parseInt(btn.dataset.dir, 10);
+      const swapIdx = idx + dir;
+
+      if (swapIdx >= 0 && swapIdx < draftDocOrder.length) {
+        const temp = draftDocOrder[idx];
+        draftDocOrder[idx] = draftDocOrder[swapIdx];
+        draftDocOrder[swapIdx] = temp;
+        renderOrderModalList();
+      }
+    });
+  });
+}
+
 function addLog(message, type = 'normal') {
   logCard.classList.remove('hidden');
   const line = document.createElement('div');
@@ -107,7 +242,7 @@ function resetApp() {
 /**
  * Deteksi 2 Entitas Unik secara Independen terhadap Urutan Penamaan:
  * 1. Jenis File: invoice (inv), email (e-mail/mail), report (laporan/lap)
- * 2. Kode Dealer: deretan digit unik dealer (misal 100123), mengabaikan pola tanggal/tahun
+ * 2. Kode Dealer: deretan digit unik dealer (misal 100601), mengabaikan pola tanggal/tahun
  */
 function extractEntities(file) {
   const fileNameNoExt = file.name.replace(/\.pdf$/i, '');
@@ -127,7 +262,7 @@ function extractEntities(file) {
   let dealerCode = null;
   const numericTokens = fileNameNoExt.match(/\d{4,10}/g) || [];
 
-  // Filter angka yang menyerupai format tanggal YYYYMMDD (misal 20261119) atau YYYYMM (misal 202611)
+  // Saring angka berformat tanggal YYYYMMDD atau YYYYMM
   const nonDateTokens = numericTokens.filter((num) => {
     const isFullDate = num.length === 8 && /^20[23]\d(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/.test(num);
     const isYearMonth = num.length === 6 && /^20[23]\d(0[1-9]|1[0-2])$/.test(num);
@@ -136,12 +271,12 @@ function extractEntities(file) {
 
   const candidateTokens = nonDateTokens.length > 0 ? nonDateTokens : numericTokens;
 
-  // Prioritas kode dealer 5-8 digit (standar kode dealer)
+  // Prioritas kode dealer 5-8 digit
   const standardCode = candidateTokens.find((num) => num.length >= 5 && num.length <= 8);
   if (standardCode) {
     dealerCode = standardCode;
   } else {
-    // Fallback kode 4 digit yang bukan tahun 2020-2035
+    // Fallback 4 digit non-tahun
     const nonYear4Digit = candidateTokens.find((num) => {
       const n = parseInt(num, 10);
       return num.length === 4 && (n < 2020 || n > 2035);
@@ -179,7 +314,7 @@ function handleFiles(allFiles) {
 
   const totalBytes = pdfFiles.reduce((acc, f) => acc + f.size, 0);
   if (totalBytes > MAX_SIZE_BYTES) {
-    alert(`Total ukuran PDF (${(totalBytes / (1024 * 1024)).toFixed(2)} MB) melebihi batas maksimal 50 MB.`);
+    alert(`Total ukuran PDF (${(totalBytes / (1024 * 1024)).toFixed(2)} MB) melebihi batas maksimal 300 MB.`);
     return;
   }
 
@@ -209,7 +344,7 @@ function handleFiles(allFiles) {
         isComplete: false,
         missingTypes: [],
         keterangan: '',
-        outputFilename: ''
+        outputFilename: `${dealerCode}_Compile.pdf`
       });
     }
 
@@ -226,8 +361,7 @@ function handleFiles(allFiles) {
     const missing = [];
     const notes = [];
 
-    DOC_ORDER.forEach((type) => {
-      // Urutkan file dalam kategori yang sama berdasarkan nama file
+    DEFAULT_DOC_ORDER.forEach((type) => {
       group.docs[type].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
       const count = group.docs[type].length;
@@ -246,7 +380,7 @@ function handleFiles(allFiles) {
         ? `Lengkap (3/3) • Catatan: ${notes.join(', ')}`
         : 'Lengkap (Invoice, Email, Report)';
     } else {
-      const foundLabels = DOC_ORDER
+      const foundLabels = docOrder
         .filter((t) => group.docs[t].length > 0)
         .map((t) => DOC_LABELS[t]);
 
@@ -257,8 +391,6 @@ function handleFiles(allFiles) {
       addLog(`Dealer ${group.dealerCode}: ${group.keterangan}`, 'warn');
     }
   });
-
-  updateOutputFilenames();
 
   // Perbarui statistik
   const completeCount = groupedDealers.filter((d) => d.isComplete).length;
@@ -282,17 +414,6 @@ function handleFiles(allFiles) {
   renderTable();
 }
 
-function updateOutputFilenames() {
-  const tagIncomplete = chkTagIncompleteFilename.checked;
-  groupedDealers.forEach((group) => {
-    if (!group.isComplete && tagIncomplete) {
-      group.outputFilename = `${group.dealerCode}_Kurang_${group.missingTypes.join('_')}.pdf`;
-    } else {
-      group.outputFilename = `${group.dealerCode}.pdf`;
-    }
-  });
-}
-
 function renderTable() {
   dealerTableBody.innerHTML = '';
 
@@ -311,7 +432,7 @@ function renderTable() {
   if (filtered.length === 0) {
     dealerTableBody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align: center; color: #94a3b8; padding: 18px;">
+        <td colspan="6" style="text-align: center; color: #64748b; padding: 20px;">
           Tidak ada data Kode Dealer yang sesuai dengan filter.
         </td>
       </tr>
@@ -333,11 +454,16 @@ function renderTable() {
 
     const badgeClass = group.isComplete ? 'status-complete' : 'status-incomplete';
 
+    // Kolom dokumen mengikuti tata letak yang dipilih di Pengaturan Urutan
+    const firstDocType = docOrder[0];
+    const secondDocType = docOrder[1];
+    const thirdDocType = docOrder[2];
+
     tr.innerHTML = `
       <td><span class="code-tag">${escapeHtml(group.dealerCode)}</span></td>
-      <td>${formatCell(group.docs.invoice)}</td>
-      <td>${formatCell(group.docs.email)}</td>
-      <td>${formatCell(group.docs.report)}</td>
+      <td>${formatCell(group.docs[firstDocType])}</td>
+      <td>${formatCell(group.docs[secondDocType])}</td>
+      <td>${formatCell(group.docs[thirdDocType])}</td>
       <td><span class="status-badge ${badgeClass}">${escapeHtml(group.keterangan)}</span></td>
       <td><code>${escapeHtml(group.outputFilename)}</code></td>
     `;
@@ -360,11 +486,13 @@ async function processAndDownloadZip() {
   btnMerge.disabled = true;
   btnSelectFolder.disabled = true;
   btnSelectFiles.disabled = true;
+  btnOpenSettings.disabled = true;
   progressWrap.style.display = 'block';
 
   const zip = new JSZip();
+  const orderHeaderLabel = docOrder.map((k) => DOC_LABELS[k].toUpperCase()).join(' -> ');
   const summaryLines = [
-    'KODE DEALER;FILE OUTPUT;STATUS;KETERANGAN;INVOICE;EMAIL;REPORT'
+    `KODE DEALER;FILE OUTPUT;TATA LETAK (${orderHeaderLabel});STATUS;KETERANGAN;INVOICE;EMAIL;REPORT`
   ];
 
   try {
@@ -372,14 +500,17 @@ async function processAndDownloadZip() {
       const group = groupedDealers[i];
       const percent = Math.round(((i + 1) / groupedDealers.length) * 100);
       progressFill.style.width = `${percent}%`;
-      progressLabel.textContent = `Menggabungkan Kode Dealer ${group.dealerCode} (${i + 1}/${groupedDealers.length})...`;
+      progressLabel.textContent = `Menggabungkan ${group.outputFilename} (${i + 1}/${groupedDealers.length})...`;
       progressPercent.textContent = `${percent}%`;
+
+      // Beri jeda micro-task agar UI tetap responsif saat memproses batch besar (hingga 300 MB)
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       const mergedPdf = await PDFLib.PDFDocument.create();
       let mergedPageCount = 0;
 
-      // Gabungkan dokumen yang tersedia sesuai urutan: Invoice -> Email -> Report
-      for (const type of DOC_ORDER) {
+      // Gabungkan dokumen sesuai tata letak aktif dari Pengaturan Urutan
+      for (const type of docOrder) {
         for (const file of group.docs[type]) {
           try {
             const arrayBuffer = await file.arrayBuffer();
@@ -400,6 +531,7 @@ async function processAndDownloadZip() {
         summaryLines.push([
           group.dealerCode,
           group.outputFilename,
+          docOrder.map((k) => DOC_LABELS[k]).join(' -> '),
           group.isComplete ? 'LENGKAP' : 'TIDAK LENGKAP',
           group.keterangan,
           group.docs.invoice.map((f) => f.name).join(' | ') || '-',
@@ -442,5 +574,6 @@ async function processAndDownloadZip() {
     btnMerge.disabled = false;
     btnSelectFolder.disabled = false;
     btnSelectFiles.disabled = false;
+    btnOpenSettings.disabled = false;
   }
 }
