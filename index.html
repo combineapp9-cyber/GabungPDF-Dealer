@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Combine PDF Dealer</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- Library 100% Client-Side: PDF-Lib & JSZip -->
+  <!-- Library 100% Client-Side: PDF-Lib -->
   <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -53,9 +52,14 @@
           <button type="button" class="btn-link" id="btnQuickEditOrder">Ubah</button>
         </div>
 
-        <button type="button" class="btn-primary" id="btnMerge" disabled>
-          Gabung PDF &amp; Download ZIP
-        </button>
+        <div class="output-actions">
+          <button type="button" class="btn-outline" id="btnDownloadPopup" disabled>
+            Download Pop-up
+          </button>
+          <button type="button" class="btn-primary" id="btnSaveFolder" disabled>
+            Gabung &amp; Simpan ke Folder
+          </button>
+        </div>
       </div>
 
       <div class="progress-wrap" id="progressWrap">
@@ -118,6 +122,7 @@
               <th id="colDoc3">Hal. 3 &bull; Report</th>
               <th>Keterangan</th>
               <th>Nama File Output</th>
+              <th>Unduh</th>
             </tr>
           </thead>
           <tbody id="dealerTableBody"></tbody>
@@ -132,6 +137,20 @@
       </div>
       <div class="log-box" id="logBox"></div>
     </section>
+  </div>
+
+  <!-- Pop-up Notifikasi Hasil -->
+  <div class="toast-popup hidden" id="donePopup" role="status" aria-live="polite">
+    <div class="toast-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
+    <div class="toast-content">
+      <strong id="donePopupTitle">Proses Selesai</strong>
+      <p id="donePopupDesc">Seluruh file PDF berhasil digabung.</p>
+    </div>
+    <button type="button" class="toast-close" id="btnCloseDonePopup" aria-label="Tutup">&times;</button>
   </div>
 
   <!-- Modal Pengaturan Tata Letak Halaman -->
