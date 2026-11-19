@@ -21,7 +21,8 @@ const filesInput = document.getElementById('filesInput');
 const btnSelectFolder = document.getElementById('btnSelectFolder');
 const btnSelectFiles = document.getElementById('btnSelectFiles');
 const btnClear = document.getElementById('btnClear');
-const btnMerge = document.getElementById('btnMerge');
+const btnSaveFolder = document.getElementById('btnSaveFolder');
+const btnDownloadPopup = document.getElementById('btnDownloadPopup');
 const searchDealerInput = document.getElementById('searchDealerInput');
 
 const activeOrderBadge = document.getElementById('activeOrderBadge');
@@ -45,6 +46,11 @@ const progressFill = document.getElementById('progressFill');
 const progressLabel = document.getElementById('progressLabel');
 const progressPercent = document.getElementById('progressPercent');
 
+const donePopup = document.getElementById('donePopup');
+const donePopupTitle = document.getElementById('donePopupTitle');
+const donePopupDesc = document.getElementById('donePopupDesc');
+const btnCloseDonePopup = document.getElementById('btnCloseDonePopup');
+
 // Inisialisasi tampilan urutan aktif saat halaman dimuat
 syncOrderUI();
 
@@ -52,7 +58,9 @@ syncOrderUI();
 btnSelectFolder.addEventListener('click', () => folderInput.click());
 btnSelectFiles.addEventListener('click', () => filesInput.click());
 btnClear.addEventListener('click', resetApp);
-btnMerge.addEventListener('click', processAndDownloadZip);
+btnSaveFolder.addEventListener('click', saveAllToChosenFolder);
+btnDownloadPopup.addEventListener('click', downloadAllViaBrowserPopup);
+btnCloseDonePopup.addEventListener('click', () => donePopup.classList.add('hidden'));
 
 searchDealerInput.addEventListener('input', (e) => {
   searchQuery = e.target.value.trim().toLowerCase();
@@ -107,9 +115,7 @@ btnSaveSettings.addEventListener('click', () => {
   docOrder = [...draftDocOrder];
   try {
     localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(docOrder));
-  } catch (_) {
-    // Abaikan jika storage dibatasi
-  }
+  } catch (_) {}
   syncOrderUI();
   renderTable();
   closeSettingsModal();
@@ -210,6 +216,12 @@ function renderOrderModalList() {
   });
 }
 
+function showDonePopup(title, description) {
+  donePopupTitle.textContent = title;
+  donePopupDesc.textContent = description;
+  donePopup.classList.remove('hidden');
+}
+
 function addLog(message, type = 'normal') {
   logCard.classList.remove('hidden');
   const line = document.createElement('div');
@@ -232,9 +244,20 @@ function resetApp() {
   statsGrid.classList.add('hidden');
   previewCard.classList.add('hidden');
   logCard.classList.add('hidden');
+  donePopup.classList.add('hidden');
   progressWrap.style.display = 'none';
-  btnMerge.disabled = true;
+  btnSaveFolder.disabled = true;
+  btnDownloadPopup.disabled = true;
   btnClear.disabled = true;
+}
+
+function setControlsBusy(busy) {
+  btnSaveFolder.disabled = busy || groupedDealers.length === 0;
+  btnDownloadPopup.disabled = busy || groupedDealers.length === 0;
+  btnSelectFolder.disabled = busy;
+  btnSelectFiles.disabled = busy;
+  btnOpenSettings.disabled = busy;
+  btnClear.disabled = busy || groupedDealers.length === 0;
 }
 
 /**
@@ -246,7 +269,6 @@ function extractEntities(file) {
   const fileNameNoExt = file.name.replace(/\.pdf$/i, '');
   const normalized = fileNameNoExt.toLowerCase();
 
-  // 1. Deteksi Jenis File
   let docType = null;
   if (/(?:^|[^a-z])(invoice|inv)(?:[^a-z]|$)/i.test(normalized)) {
     docType = 'invoice';
@@ -256,7 +278,6 @@ function extractEntities(file) {
     docType = 'report';
   }
 
-  // 2. Deteksi Kode Dealer
   let dealerCode = null;
   const numericTokens = fileNameNoExt.match(/\d{4,10}/g) || [];
 
@@ -283,7 +304,6 @@ function extractEntities(file) {
     }
   }
 
-  // Fallback: cek nama folder induk jika kode dealer tidak tertulis di nama file
   if (!dealerCode && file.webkitRelativePath) {
     const parts = file.webkitRelativePath.split('/');
     if (parts.length >= 2) {
@@ -396,7 +416,8 @@ function handleFiles(allFiles) {
   statsGrid.classList.remove('hidden');
   previewCard.classList.remove('hidden');
   btnClear.disabled = false;
-  btnMerge.disabled = groupedDealers.length === 0;
+  btnSaveFolder.disabled = groupedDealers.length === 0;
+  btnDownloadPopup.disabled = groupedDealers.length === 0;
 
   addLog(
     `Pemindaian selesai (${pdfFiles.length} PDF): ${groupedDealers.length} Kode Dealer terdeteksi (${completeCount} lengkap, ${incompleteCount} tidak lengkap, ${ignoredCount} diabaikan).`,
@@ -424,7 +445,7 @@ function renderTable() {
   if (filtered.length === 0) {
     dealerTableBody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align: center; color: #64748b; padding: 20px;">
+        <td colspan="7" style="text-align: center; color: #64748b; padding: 20px;">
           Tidak ada data Kode Dealer yang sesuai dengan filter.
         </td>
       </tr>
@@ -457,9 +478,35 @@ function renderTable() {
       <td>${formatCell(group.docs[thirdDocType])}</td>
       <td><span class="status-badge ${badgeClass}">${escapeHtml(group.keterangan)}</span></td>
       <td><code>${escapeHtml(group.outputFilename)}</code></td>
+      <td>
+        <button type="button" class="btn-row-dl" data-code="${escapeHtml(group.dealerCode)}" title="Download ${escapeHtml(group.outputFilename)}">
+          PDF
+        </button>
+      </td>
     `;
 
     dealerTableBody.appendChild(tr);
+  });
+
+  dealerTableBody.querySelectorAll('.btn-row-dl').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const code = btn.dataset.code;
+      const targetGroup = groupedDealers.find((g) => g.dealerCode === code);
+      if (!targetGroup) return;
+
+      btn.disabled = true;
+      btn.textContent = '...';
+      try {
+        const result = await buildMergedPdfForGroup(targetGroup);
+        if (result) {
+          triggerBrowserDownload(result.bytes, targetGroup.outputFilename, 'application/pdf');
+          addLog(`Diunduh satuan: ${targetGroup.outputFilename} (${result.pageCount} halaman).`, 'ok');
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'PDF';
+      }
+    });
   });
 }
 
@@ -471,52 +518,95 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-async function processAndDownloadZip() {
+async function buildMergedPdfForGroup(group) {
+  const mergedPdf = await PDFLib.PDFDocument.create();
+  let mergedPageCount = 0;
+
+  for (const type of docOrder) {
+    for (const file of group.docs[type]) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const srcPdf = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+        const copiedPages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
+        mergedPageCount += copiedPages.length;
+      } catch (fileErr) {
+        addLog(`Gagal membaca file "${file.name}" pada dealer ${group.dealerCode}: ${fileErr.message}`, 'err');
+      }
+    }
+  }
+
+  if (mergedPageCount === 0) return null;
+  const bytes = await mergedPdf.save();
+  return { bytes, pageCount: mergedPageCount };
+}
+
+function triggerBrowserDownload(dataBytes, filename, mimeType) {
+  const blob = new Blob([dataBytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/**
+ * Opsi 1: Simpan Langsung ke Satu Folder Pilihan (tanpa ZIP)
+ * Otomatis beralih ke Download Pop-up jika browser tidak mendukung showDirectoryPicker
+ */
+async function saveAllToChosenFolder() {
   if (groupedDealers.length === 0) return;
 
-  btnMerge.disabled = true;
-  btnSelectFolder.disabled = true;
-  btnSelectFiles.disabled = true;
-  btnOpenSettings.disabled = true;
-  progressWrap.style.display = 'block';
+  if (typeof window.showDirectoryPicker !== 'function') {
+    addLog('Browser tidak mendukung pilih folder langsung. Beralih ke mode Download Pop-up...', 'warn');
+    await downloadAllViaBrowserPopup();
+    return;
+  }
 
-  const zip = new JSZip();
+  let dirHandle;
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      addLog('Penyimpanan ke folder dibatalkan.', 'warn');
+      return;
+    }
+    addLog(`Akses folder langsung tidak tersedia (${err.message}). Beralih ke Download Pop-up...`, 'warn');
+    await downloadAllViaBrowserPopup();
+    return;
+  }
+
+  setControlsBusy(true);
+  progressWrap.style.display = 'block';
+  donePopup.classList.add('hidden');
+
   const orderHeaderLabel = docOrder.map((k) => DOC_LABELS[k].toUpperCase()).join(' -> ');
   const summaryLines = [
     `KODE DEALER;FILE OUTPUT;TATA LETAK (${orderHeaderLabel});STATUS;KETERANGAN;INVOICE;EMAIL;REPORT`
   ];
+  let savedCount = 0;
 
   try {
     for (let i = 0; i < groupedDealers.length; i++) {
       const group = groupedDealers[i];
       const percent = Math.round(((i + 1) / groupedDealers.length) * 100);
       progressFill.style.width = `${percent}%`;
-      progressLabel.textContent = `Menggabungkan ${group.outputFilename} (${i + 1}/${groupedDealers.length})...`;
+      progressLabel.textContent = `Menyimpan ${group.outputFilename} ke folder "${dirHandle.name}" (${i + 1}/${groupedDealers.length})...`;
       progressPercent.textContent = `${percent}%`;
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      const mergedPdf = await PDFLib.PDFDocument.create();
-      let mergedPageCount = 0;
+      const result = await buildMergedPdfForGroup(group);
+      if (result) {
+        const fileHandle = await dirHandle.getFileHandle(group.outputFilename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(result.bytes);
+        await writable.close();
 
-      for (const type of docOrder) {
-        for (const file of group.docs[type]) {
-          try {
-            const arrayBuffer = await file.arrayBuffer();
-            const srcPdf = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-            const copiedPages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
-            copiedPages.forEach((page) => mergedPdf.addPage(page));
-            mergedPageCount += copiedPages.length;
-          } catch (fileErr) {
-            addLog(`Gagal membaca file "${file.name}" pada dealer ${group.dealerCode}: ${fileErr.message}`, 'err');
-          }
-        }
-      }
-
-      if (mergedPageCount > 0) {
-        const mergedBytes = await mergedPdf.save();
-        zip.file(group.outputFilename, mergedBytes);
-
+        savedCount++;
         summaryLines.push([
           group.dealerCode,
           group.outputFilename,
@@ -529,7 +619,7 @@ async function processAndDownloadZip() {
         ].join(';'));
 
         addLog(
-          `Berhasil digabung: ${group.outputFilename} (${mergedPageCount} halaman) -> ${group.keterangan}`,
+          `Tersimpan di "${dirHandle.name}": ${group.outputFilename} (${result.pageCount} halaman) -> ${group.keterangan}`,
           group.isComplete ? 'ok' : 'warn'
         );
       } else {
@@ -537,31 +627,77 @@ async function processAndDownloadZip() {
       }
     }
 
-    zip.file('_Rekap_Keterangan_Gabung.csv', '\uFEFF' + summaryLines.join('\n'));
+    // Simpan file rekap CSV di dalam folder yang sama
+    const csvHandle = await dirHandle.getFileHandle('_Rekap_Keterangan_Gabung.csv', { create: true });
+    const csvWritable = await csvHandle.createWritable();
+    await csvWritable.write('\uFEFF' + summaryLines.join('\n'));
+    await csvWritable.close();
 
-    progressLabel.textContent = 'Membuat arsip ZIP...';
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-    const today = new Date().toISOString().slice(0, 10);
-    const downloadUrl = URL.createObjectURL(zipBlob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `Combine_PDF_Dealer_${today}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(downloadUrl);
-
-    progressLabel.textContent = 'Selesai! Arsip ZIP otomatis terunduh.';
-    addLog(`Selesai! File Combine_PDF_Dealer_${today}.zip berhasil diunduh.`, 'ok');
+    progressLabel.textContent = `Selesai! ${savedCount} file PDF tersimpan di folder "${dirHandle.name}".`;
+    addLog(`Selesai! ${savedCount} file PDF dan rekap CSV tersimpan di folder "${dirHandle.name}".`, 'ok');
+    showDonePopup(
+      'Tersimpan ke Folder',
+      `${savedCount} file PDF berhasil disimpan langsung ke dalam folder "${dirHandle.name}".`
+    );
   } catch (err) {
     console.error(err);
-    addLog(`Terjadi kesalahan saat memproses PDF: ${err.message}`, 'err');
-    alert(`Gagal menggabungkan PDF: ${err.message}`);
+    addLog(`Gagal menyimpan ke folder: ${err.message}`, 'err');
+    alert(`Gagal menyimpan file ke folder: ${err.message}`);
   } finally {
-    btnMerge.disabled = false;
-    btnSelectFolder.disabled = false;
-    btnSelectFiles.disabled = false;
-    btnOpenSettings.disabled = false;
+    setControlsBusy(false);
+  }
+}
+
+/**
+ * Opsi 2: Download Langsung Satu per Satu via Pop-up Browser (tanpa ZIP)
+ */
+async function downloadAllViaBrowserPopup() {
+  if (groupedDealers.length === 0) return;
+
+  setControlsBusy(true);
+  progressWrap.style.display = 'block';
+  donePopup.classList.add('hidden');
+
+  let downloadedCount = 0;
+
+  try {
+    for (let i = 0; i < groupedDealers.length; i++) {
+      const group = groupedDealers[i];
+      const percent = Math.round(((i + 1) / groupedDealers.length) * 100);
+      progressFill.style.width = `${percent}%`;
+      progressLabel.textContent = `Mengunduh ${group.outputFilename} (${i + 1}/${groupedDealers.length})...`;
+      progressPercent.textContent = `${percent}%`;
+
+      const result = await buildMergedPdfForGroup(group);
+      if (result) {
+        triggerBrowserDownload(result.bytes, group.outputFilename, 'application/pdf');
+        downloadedCount++;
+
+        addLog(
+          `Diunduh: ${group.outputFilename} (${result.pageCount} halaman) -> ${group.keterangan}`,
+          group.isComplete ? 'ok' : 'warn'
+        );
+
+        // Jeda singkat agar browser tidak memblokir antrean pop-up unduhan
+        if (i < groupedDealers.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+      } else {
+        addLog(`Dealer ${group.dealerCode} dilewati karena tidak ada halaman PDF yang valid.`, 'err');
+      }
+    }
+
+    progressLabel.textContent = `Selesai! ${downloadedCount} file PDF diunduh.`;
+    addLog(`Selesai! ${downloadedCount} file PDF berhasil diunduh ke folder Downloads browser.`, 'ok');
+    showDonePopup(
+      'Unduhan PDF Selesai',
+      `${downloadedCount} file PDF telah diunduh melalui browser.`
+    );
+  } catch (err) {
+    console.error(err);
+    addLog(`Terjadi kesalahan saat mengunduh PDF: ${err.message}`, 'err');
+    alert(`Gagal mengunduh PDF: ${err.message}`);
+  } finally {
+    setControlsBusy(false);
   }
 }
