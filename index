@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Combine PDF Dealer</title>
+  <!-- Library 100% Client-Side: PDF-Lib & JSZip -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg-main: #0b1320;
+      --bg-card: #111d30;
+      --bg-navy: #193a5a;
+      --bg-input: #0e1929;
+      --primary: #0078d4;
+      --primary-hover: #0063b1;
+      --accent: #72BAEC;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #233b59;
+      --success-bg: rgba(16, 185, 129, 0.14);
+      --success-text: #34d399;
+      --warn-bg: rgba(245, 158, 11, 0.14);
+      --warn-text: #fbbf24;
+      --danger-bg: rgba(239, 68, 68, 0.14);
+      --danger-text: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    /* Header langsung tanpa logo */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.3px;
+    }
+
+    .header p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge-security {
+      background: var(--bg-navy);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    /* Dropzone / Upload Area */
+    .upload-zone {
+      border: 2px dashed #2c5282;
+      background: var(--bg-input);
+      border-radius: 10px;
+      padding: 28px 20px;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(114, 186, 236, 0.08);
+    }
+
+    .upload-zone h2 {
+      font-size: 1.05rem;
+      margin-bottom: 6px;
+      color: var(--text-main);
+    }
+
+    .upload-zone p {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 18px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: background 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-navy {
+      background: var(--bg-navy);
+      color: var(--accent);
+      border: 1px solid #2b5885;
+    }
+
+    .btn-navy:hover:not(:disabled) {
+      background: #204a73;
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: #e2e8f0;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    /* Options & Stats Bar */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .checkbox-label input {
+      accent-color: var(--primary);
+      width: 15px;
+      height: 15px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .stat-box .label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-box .value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-box.warn .value {
+      color: var(--warn-text);
+    }
+
+    .stat-box.success .value {
+      color: var(--success-text);
+    }
+
+    /* Filter Tabs */
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .table-header h3 {
+      font-size: 1rem;
+      color: var(--accent);
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+    }
+
+    .pill {
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      border-radius: 999px;
+      background: var(--bg-input);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .pill.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    th {
+      background: var(--bg-navy);
+      color: var(--accent);
+      text-align: left;
+      padding: 11px 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:hover td {
+      background: rgba(114, 186, 236, 0.04);
+    }
+
+    .code-tag {
+      font-family: Consolas, monospace;
+      font-weight: 700;
+      color: #fff;
+      background: var(--bg-navy);
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .doc-found {
+      color: var(--success-text);
+      font-size: 0.8rem;
+      word-break: break-word;
+    }
+
+    .doc-missing {
+      color: var(--danger-text);
+      font-size: 0.8rem;
+      font-style: italic;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 5px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .status-complete {
+      background: var(--success-bg);
+      color: var(--success-text);
+    }
+
+    .status-incomplete {
+      background: var(--warn-bg);
+      color: var(--warn-text);
+    }
+
+    /* Progress & Logs */
+    .progress-wrap {
+      margin-top: 14px;
+      display: none;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: var(--bg-input);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transition: width 0.2s ease;
+    }
+
+    .progress-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .log-box {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: Consolas, monospace;
+      font-size: 0.79rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    .log-warn { color: var(--warn-text); }
+    .log-err { color: var(--danger-text); }
+    .log-ok { color: var(--success-text); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>Combine PDF Dealer</h1>
+        <p>Penggabungan PDF otomatis berdasarkan deteksi entitas <strong>[Kode Dealer]</strong> &amp; <strong>[Invoice, Email, Report]</strong></p>
+      </div>
+      <div class="badge-security">100% Local Browser &bull; Maks. 50 MB</div>
+    </div>
+
+    <!-- Area Upload -->
+    <div class="card">
+      <div class="upload-zone" id="dropZone">
+        <h2>Pilih Folder atau File PDF untuk Digabung</h2>
+        <p>Mendukung urutan nama file fleksibel (misal: <code>Invoice_100123.pdf</code> maupun <code>100123_Report.pdf</code>).<br>Jika salah satu dokumen tidak ada, file tetap digabung dengan keterangan status.</p>
+        <div class="btn-group">
+          <button type="button" class="btn-navy" id="btnSelectFolder">Pilih Folder</button>
+          <button type="button" class="btn-secondary" id="btnSelectFiles">Pilih File PDF</button>
+          <button type="button" class="btn-secondary" id="btnClear" disabled>Reset</button>
+        </div>
+        <input type="file" id="folderInput" webkitdirectory directory multiple hidden />
+        <input type="file" id="filesInput" accept=".pdf,application/pdf" multiple hidden />
+      </div>
+
+      <div class="toolbar">
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkTagIncompleteFilename" checked />
+          Tandai keterangan kekurangan dokumen pada nama file hasil (contoh: <code>100123_Kurang_Email.pdf</code>)
+        </label>
+
+        <button type="button" class="btn-primary" id="btnMerge" disabled>
+          Gabung PDF &amp; Download ZIP
+        </button>
+      </div>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text">
+          <span id="progressLabel">Memproses...</span>
+          <span id="progressPercent">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ringkasan Statistik -->
+    <div class="stats-grid hidden" id="statsGrid">
+      <div class="stat-box">
+        <div class="label">Total Kode Dealer</div>
+        <div class="value" id="statDealers">0</div>
+      </div>
+      <div class="stat-box success">
+        <div class="label">Lengkap (3/3 Dokumen)</div>
+        <div class="value" id="statComplete">0</div>
+      </div>
+      <div class="stat-box warn">
+        <div class="label">Tidak Lengkap (Tetap Digabung)</div>
+        <div class="value" id="statIncomplete">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Total Ukuran PDF</div>
+        <div class="value" id="statSize">0 MB</div>
+      </div>
+    </div>
+
+    <!-- Tabel Hasil Deteksi Entitas -->
+    <div class="card hidden" id="previewCard">
+      <div class="table-header">
+        <h3>Hasil Deteksi Entitas per Kode Dealer</h3>
+        <div class="filter-pills">
+          <button type="button" class="pill active" data-filter="all">Semua</button>
+          <button type="button" class="pill" data-filter="complete">Lengkap</button>
+          <button type="button" class="pill" data-filter="incomplete">Tidak Lengkap</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Kode Dealer</th>
+              <th>1. Invoice</th>
+              <th>2. Email</th>
+              <th>3. Report</th>
+              <th>Keterangan</th>
+              <th>Nama File Output</th>
+            </tr>
+          </thead>
+          <tbody id="dealerTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Log Proses & File Diabaikan -->
+    <div class="card hidden" id="logCard">
+      <div class="table-header">
+        <h3>Log Deteksi &amp; Proses</h3>
+      </div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+  </div>
+
+  <script>
+    const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+    const DOC_ORDER = ['invoice', 'email', 'report'];
+    const DOC_LABELS = {
+      invoice: 'Invoice',
+      email: 'Email',
+      report: 'Report'
+    };
+
+    let groupedDealers = []; // Array hasil grouping per kode dealer
+    let currentFilter = 'all';
+
+    // DOM Elements
+    const dropZone = document.getElementById('dropZone');
+    const folderInput = document.getElementById('folderInput');
+    const filesInput = document.getElementById('filesInput');
+    const btnSelectFolder = document.getElementById('btnSelectFolder');
+    const btnSelectFiles = document.getElementById('btnSelectFiles');
+    const btnClear = document.getElementById('btnClear');
+    const btnMerge = document.getElementById('btnMerge');
+    const chkTagIncompleteFilename = document.getElementById('chkTagIncompleteFilename');
+
+    const statsGrid = document.getElementById('statsGrid');
+    const previewCard = document.getElementById('previewCard');
+    const logCard = document.getElementById('logCard');
+    const dealerTableBody = document.getElementById('dealerTableBody');
+    const logBox = document.getElementById('logBox');
+
+    const progressWrap = document.getElementById('progressWrap');
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel = document.getElementById('progressLabel');
+    const progressPercent = document.getElementById('progressPercent');
+
+    // Event Listeners
+    btnSelectFolder.addEventListener('click', () => folderInput.click());
+    btnSelectFiles.addEventListener('click', () => filesInput.click());
+    btnClear.addEventListener('click', resetApp);
+    btnMerge.addEventListener('click', processAndDownloadZip);
+    chkTagIncompleteFilename.addEventListener('change', () => {
+      updateOutputFilenames();
+      renderTable();
+    });
+
+    folderInput.addEventListener('change', (e) => handleFiles(Array.from(e.target.files)));
+    filesInput.addEventListener('change', (e) => handleFiles(Array.from(e.target.files)));
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) {
+        handleFiles(Array.from(e.dataTransfer.files));
+      }
+    });
+
+    document.querySelectorAll('.pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.pill').forEach((p) => p.classList.remove('active'));
+        pill.classList.add('active');
+        currentFilter = pill.dataset.filter;
+        renderTable();
+      });
+    });
+
+    function addLog(message, type = 'normal') {
+      logCard.classList.remove('hidden');
+      const line = document.createElement('div');
+      if (type === 'warn') line.className = 'log-warn';
+      if (type === 'err') line.className = 'log-err';
+      if (type === 'ok') line.className = 'log-ok';
+      line.textContent = `[${new Date().toLocaleTimeString('id-ID')}] ${message}`;
+      logBox.appendChild(line);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function resetApp() {
+      groupedDealers = [];
+      folderInput.value = '';
+      filesInput.value = '';
+      dealerTableBody.innerHTML = '';
+      logBox.innerHTML = '';
+      statsGrid.classList.add('hidden');
+      previewCard.classList.add('hidden');
+      logCard.classList.add('hidden');
+      progressWrap.style.display = 'none';
+      btnMerge.disabled = true;
+      btnClear.disabled = true;
+    }
+
+    /**
+     * Deteksi 2 Entitas Unik secara Independen terhadap Urutan Penamaan:
+     * 1. Jenis File: invoice (inv), email (mail), report (lap/laporan)
+     * 2. Kode Dealer: deretan angka/kode unik dealer (misal 100123)
+     */
+    function extractEntities(file) {
+      const fileNameNoExt = file.name.replace(/\.pdf$/i, '');
+      const normalized = fileNameNoExt.toLowerCase();
+
+      // 1. Deteksi Jenis File (mendukung pemisah spasi/underscore/dash maupun menempel dengan angka)
+      let docType = null;
+      if (/(?:^|[^a-z])(invoice|inv)(?:[^a-z]|$)/i.test(normalized)) {
+        docType = 'invoice';
+      } else if (/(?:^|[^a-z])(e-?mail|mail)(?:[^a-z]|$)/i.test(normalized)) {
+        docType = 'email';
+      } else if (/(?:^|[^a-z])(report|laporan|lap)(?:[^a-z]|$)/i.test(normalized)) {
+        docType = 'report';
+      }
+
+      // 2. Deteksi Kode Dealer (prioritas 5-8 digit angka standar KTB, fallback 4 digit non-tahun)
+      let dealerCode = null;
+      const numericTokens = fileNameNoExt.match(/\d{4,10}/g) || [];
+
+      // Prioritaskan kode 5-8 digit (misal 100123)
+      const standardCode = numericTokens.find((num) => num.length >= 5 && num.length <= 8);
+      if (standardCode) {
+        dealerCode = standardCode;
+      } else {
+        // Fallback 4 digit yang bukan tahun 2020-2035
+        const nonYear4Digit = numericTokens.find((num) => {
+          const n = parseInt(num, 10);
+          return num.length === 4 && (n < 2020 || n > 2035);
+        });
+        if (nonYear4Digit) {
+          dealerCode = nonYear4Digit;
+        } else if (numericTokens.length > 0) {
+          dealerCode = numericTokens[0];
+        }
+      }
+
+      // Fallback terakhir: cek nama folder induk jika kode dealer tidak ada di nama file
+      if (!dealerCode && file.webkitRelativePath) {
+        const parts = file.webkitRelativePath.split('/');
+        if (parts.length >= 2) {
+          const parentFolder = parts[parts.length - 2];
+          const folderNums = parentFolder.match(/\d{4,8}/g);
+          if (folderNums && folderNums.length > 0) {
+            dealerCode = folderNums[0];
+          }
+        }
+      }
+
+      return { dealerCode, docType };
+    }
+
+    function handleFiles(allFiles) {
+      resetApp();
+
+      const pdfFiles = allFiles.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
+      if (pdfFiles.length === 0) {
+        alert('Tidak ada file PDF yang ditemukan.');
+        return;
+      }
+
+      const totalBytes = pdfFiles.reduce((acc, f) => acc + f.size, 0);
+      if (totalBytes > MAX_SIZE_BYTES) {
+        alert(`Total ukuran PDF (${(totalBytes / (1024 * 1024)).toFixed(2)} MB) melebihi batas maksimal 50 MB.`);
+        return;
+      }
+
+      const dealerMap = new Map();
+      let ignoredCount = 0;
+
+      pdfFiles.forEach((file) => {
+        const { dealerCode, docType } = extractEntities(file);
+
+        if (!dealerCode || !docType) {
+          ignoredCount++;
+          const missingInfo = [];
+          if (!dealerCode) missingInfo.push('Kode Dealer');
+          if (!docType) missingInfo.push('Jenis File (Invoice/Email/Report)');
+          addLog(`Diabaikan: "${file.name}" -> Entitas tidak terbaca (${missingInfo.join(' & ')})`, 'err');
+          return;
+        }
+
+        if (!dealerMap.has(dealerCode)) {
+          dealerMap.set(dealerCode, {
+            dealerCode,
+            docs: {
+              invoice: [],
+              email: [],
+              report: []
+            },
+            isComplete: false,
+            missingTypes: [],
+            keterangan: '',
+            outputFilename: ''
+          });
+        }
+
+        dealerMap.get(dealerCode).docs[docType].push(file);
+      });
+
+      // Susun hasil grouping & buat keterangan kelengkapan per dealer
+      groupedDealers = Array.from(dealerMap.values()).sort((a, b) =>
+        a.dealerCode.localeCompare(b.dealerCode, undefined, { numeric: true })
+      );
+
+      groupedDealers.forEach((group) => {
+        const missing = [];
+        const notes = [];
+
+        DOC_ORDER.forEach((type) => {
+          const count = group.docs[type].length;
+          if (count === 0) {
+            missing.push(DOC_LABELS[type]);
+          } else if (count > 1) {
+            notes.push(`${count}x ${DOC_LABELS[type]}`);
+          }
+        });
+
+        group.missingTypes = missing;
+        group.isComplete = missing.length === 0;
+
+        if (group.isComplete) {
+          group.keterangan = notes.length
+            ? `Lengkap (3/3) • Catatan: ${notes.join(', ')}`
+            : 'Lengkap (Invoice, Email, Report)';
+        } else {
+          const foundLabels = DOC_ORDER
+            .filter((t) => group.docs[t].length > 0)
+            .map((t) => DOC_LABELS[t]);
+          group.keterangan = `Tidak Lengkap — Kurang: ${missing.join(', ')} (Ada: ${foundLabels.join(', ')})`;
+          if (notes.length) {
+            group.keterangan += ` • ${notes.join(', ')}`;
+          }
+          addLog(`Dealer ${group.dealerCode}: ${group.keterangan}`, 'warn');
+        }
+      });
+
+      updateOutputFilenames();
+
+      // Update UI Statistik
+      const completeCount = groupedDealers.filter((d) => d.isComplete).length;
+      const incompleteCount = groupedDealers.length - completeCount;
+
+      document.getElementById('statDealers').textContent = groupedDealers.length;
+      document.getElementById('statComplete').textContent = completeCount;
+      document.getElementById('statIncomplete').textContent = incompleteCount;
+      document.getElementById('statSize').textContent = `${(totalBytes / (1024 * 1024)).toFixed(2)} MB`;
+
+      statsGrid.classList.remove('hidden');
+      previewCard.classList.remove('hidden');
+      btnClear.disabled = false;
+      btnMerge.disabled = groupedDealers.length === 0;
+
+      addLog(
+        `Selesai memindai ${pdfFiles.length} PDF: ${groupedDealers.length} Kode Dealer terdeteksi (${completeCount} lengkap, ${incompleteCount} tidak lengkap, ${ignoredCount} diabaikan).`,
+        'ok'
+      );
+
+      renderTable();
+    }
+
+    function updateOutputFilenames() {
+      const tagIncomplete = chkTagIncompleteFilename.checked;
+      groupedDealers.forEach((group) => {
+        if (!group.isComplete && tagIncomplete) {
+          group.outputFilename = `${group.dealerCode}_Kurang_${group.missingTypes.join('_')}.pdf`;
+        } else {
+          group.outputFilename = `${group.dealerCode}.pdf`;
+        }
+      });
+    }
+
+    function renderTable() {
+      dealerTableBody.innerHTML = '';
+
+      const filtered = groupedDealers.filter((d) => {
+        if (currentFilter === 'complete') return d.isComplete;
+        if (currentFilter === 'incomplete') return !d.isComplete;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        dealerTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#94a3b8; padding:18px;">Tidak ada data pada filter ini.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach((group) => {
+        const tr = document.createElement('tr');
+
+        const formatCell = (filesArr) => {
+          if (filesArr.length === 0) {
+            return `<span class="doc-missing">Tidak ada</span>`;
+          }
+          return filesArr.map((f) => `<div class="doc-found">&#10003; ${escapeHtml(f.name)}</div>`).join('');
+        };
+
+        const badgeClass = group.isComplete ? 'status-complete' : 'status-incomplete';
+
+        tr.innerHTML = `
+          <td><span class="code-tag">${escapeHtml(group.dealerCode)}</span></td>
+          <td>${formatCell(group.docs.invoice)}</td>
+          <td>${formatCell(group.docs.email)}</td>
+          <td>${formatCell(group.docs.report)}</td>
+          <td><span class="status-badge ${badgeClass}">${escapeHtml(group.keterangan)}</span></td>
+          <td><code>${escapeHtml(group.outputFilename)}</code></td>
+        `;
+
+        dealerTableBody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    async function processAndDownloadZip() {
+      if (groupedDealers.length === 0) return;
+
+      btnMerge.disabled = true;
+      btnSelectFolder.disabled = true;
+      btnSelectFiles.disabled = true;
+      progressWrap.style.display = 'block';
+
+      const zip = new JSZip();
+      const summaryLines = [
+        'KODE DEALER;FILE OUTPUT;STATUS;KETERANGAN;INVOICE;EMAIL;REPORT'
+      ];
+
+      try {
+        for (let i = 0; i < groupedDealers.length; i++) {
+          const group = groupedDealers[i];
+          const percent = Math.round(((i + 1) / groupedDealers.length) * 100);
+          progressFill.style.width = `${percent}%`;
+          progressLabel.textContent = `Menggabungkan Kode Dealer ${group.dealerCode} (${i + 1}/${groupedDealers.length})...`;
+          progressPercent.textContent = `${percent}%`;
+
+          const mergedPdf = await PDFLib.PDFDocument.create();
+
+          // Urutan penggabungan standar: Invoice -> Email -> Report (yang tersedia saja)
+          for (const type of DOC_ORDER) {
+            for (const file of group.docs[type]) {
+              const arrayBuffer = await file.arrayBuffer();
+              const srcPdf = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+              const copiedPages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
+              copiedPages.forEach((page) => mergedPdf.addPage(page));
+            }
+          }
+
+          const mergedBytes = await mergedPdf.save();
+          zip.file(group.outputFilename, mergedBytes);
+
+          summaryLines.push([
+            group.dealerCode,
+            group.outputFilename,
+            group.isComplete ? 'LENGKAP' : 'TIDAK LENGKAP',
+            group.keterangan,
+            group.docs.invoice.map((f) => f.name).join(' | ') || '-',
+            group.docs.email.map((f) => f.name).join(' | ') || '-',
+            group.docs.report.map((f) => f.name).join(' | ') || '-'
+          ].join(';'));
+
+          addLog(`Berhasil digabung: ${group.outputFilename} -> ${group.keterangan}`, group.isComplete ? 'ok' : 'warn');
+        }
+
+        // Sertakan rekap keterangan CSV di dalam ZIP
+        zip.file('_Rekap_Keterangan_Gabung.csv', '\uFEFF' + summaryLines.join('\n'));
+
+        progressLabel.textContent = 'Membuat arsip ZIP...';
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        const today = new Date().toISOString().slice(0, 10);
+        const downloadUrl = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `Combine_PDF_Dealer_${today}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(downloadUrl);
+
+        progressLabel.textContent = 'Selesai! File ZIP otomatis terunduh.';
+        addLog(`Selesai! Arsip Combine_PDF_Dealer_${today}.zip berhasil diunduh.`, 'ok');
+      } catch (err) {
+        console.error(err);
+        addLog(`Terjadi kesalahan saat memproses PDF: ${err.message}`, 'err');
+        alert(`Gagal menggabungkan PDF: ${err.message}`);
+      } finally {
+        btnMerge.disabled = false;
+        btnSelectFolder.disabled = false;
+        btnSelectFiles.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
