@@ -13,10 +13,7 @@
   <div class="container">
     <!-- Header -->
     <header class="header">
-      <div>
-        <h1>Combine PDF Dealer</h1>
-        <p>Penggabungan PDF otomatis berdasarkan deteksi <strong>[Kode Dealer]</strong> &amp; <strong>[Invoice, Email, Report]</strong></p>
-      </div>
+      <h1>Combine PDF Dealer</h1>
       <div class="header-actions">
         <span class="badge-limit">100% Lokal &bull; Maks. 300 MB</span>
         <button type="button" class="btn-outline" id="btnOpenSettings">
@@ -33,17 +30,13 @@
     <section class="card">
       <div class="upload-zone" id="dropZone">
         <div class="upload-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="17 8 12 3 7 8"></polyline>
             <line x1="12" y1="3" x2="12" y2="15"></line>
           </svg>
         </div>
         <h2>Pilih Folder atau File PDF untuk Digabung</h2>
-        <p>
-          Mendukung urutan penamaan file fleksibel (contoh: <code>Invoice_100601.pdf</code> maupun <code>100601_Report.pdf</code>).<br />
-          Dokumen yang tidak lengkap tetap digabung otomatis menjadi <code>[KodeDealer]_Compile.pdf</code> disertai keterangan status.
-        </p>
         <div class="btn-group">
           <button type="button" class="btn-navy" id="btnSelectFolder">Pilih Folder</button>
           <button type="button" class="btn-secondary" id="btnSelectFiles">Pilih File PDF</button>
@@ -147,7 +140,7 @@
       <div class="modal-header">
         <div>
           <h3 id="settingsModalTitle">Pengaturan Tata Letak Halaman</h3>
-          <p>Atur urutan penggabungan dokumen di dalam setiap file <code>[KodeDealer]_Compile.pdf</code></p>
+          <p>Urutan halaman di dalam <code>[KodeDealer]_Compile.pdf</code></p>
         </div>
         <button type="button" class="btn-icon-close" id="btnCloseSettings" aria-label="Tutup">&times;</button>
       </div>
