@@ -11,36 +11,54 @@
 </head>
 <body>
   <div class="container">
+    <!-- Header -->
     <header class="header">
       <div>
         <h1>Combine PDF Dealer</h1>
         <p>Penggabungan PDF otomatis berdasarkan deteksi <strong>[Kode Dealer]</strong> &amp; <strong>[Invoice, Email, Report]</strong></p>
       </div>
-      <div class="badge-security">100% Client-Side &bull; Maks. 50 MB</div>
+      <div class="header-actions">
+        <span class="badge-limit">100% Lokal &bull; Maks. 300 MB</span>
+        <button type="button" class="btn-outline" id="btnOpenSettings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Pengaturan Urutan
+        </button>
+      </div>
     </header>
 
     <!-- Area Upload -->
     <section class="card">
       <div class="upload-zone" id="dropZone">
+        <div class="upload-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </div>
         <h2>Pilih Folder atau File PDF untuk Digabung</h2>
         <p>
-          Urutan penamaan file bebas (contoh: <code>Invoice_100123.pdf</code> atau <code>100123_Report.pdf</code>).<br />
-          Jika salah satu dokumen tidak ada, file tetap digabung disertai keterangan status.
+          Mendukung urutan penamaan file fleksibel (contoh: <code>Invoice_100601.pdf</code> maupun <code>100601_Report.pdf</code>).<br />
+          Dokumen yang tidak lengkap tetap digabung otomatis menjadi <code>[KodeDealer]_Compile.pdf</code> disertai keterangan status.
         </p>
         <div class="btn-group">
           <button type="button" class="btn-navy" id="btnSelectFolder">Pilih Folder</button>
           <button type="button" class="btn-secondary" id="btnSelectFiles">Pilih File PDF</button>
-          <button type="button" class="btn-secondary" id="btnClear" disabled>Reset</button>
+          <button type="button" class="btn-ghost" id="btnClear" disabled>Reset</button>
         </div>
         <input type="file" id="folderInput" webkitdirectory directory multiple hidden />
         <input type="file" id="filesInput" accept=".pdf,application/pdf" multiple hidden />
       </div>
 
       <div class="toolbar">
-        <label class="checkbox-label">
-          <input type="checkbox" id="chkTagIncompleteFilename" checked />
-          Tambahkan keterangan kekurangan pada nama file hasil (contoh: <code>100123_Kurang_Email.pdf</code>)
-        </label>
+        <div class="order-indicator">
+          <span class="order-label">Tata Letak Aktif:</span>
+          <span class="order-pill" id="activeOrderBadge">1. Invoice &rarr; 2. Email &rarr; 3. Report</span>
+          <button type="button" class="btn-link" id="btnQuickEditOrder">Ubah</button>
+        </div>
 
         <button type="button" class="btn-primary" id="btnMerge" disabled>
           Gabung PDF &amp; Download ZIP
@@ -102,9 +120,9 @@
           <thead>
             <tr>
               <th>Kode Dealer</th>
-              <th>1. Invoice</th>
-              <th>2. Email</th>
-              <th>3. Report</th>
+              <th id="colDoc1">Hal. 1 &bull; Invoice</th>
+              <th id="colDoc2">Hal. 2 &bull; Email</th>
+              <th id="colDoc3">Hal. 3 &bull; Report</th>
               <th>Keterangan</th>
               <th>Nama File Output</th>
             </tr>
@@ -114,13 +132,38 @@
       </div>
     </section>
 
-    <!-- Log Deteksi & Proses -->
+    <!-- Riwayat Proses -->
     <section class="card hidden" id="logCard">
       <div class="table-header">
-        <h3>Log Deteksi &amp; Proses</h3>
+        <h3>Riwayat Proses</h3>
       </div>
       <div class="log-box" id="logBox"></div>
     </section>
+  </div>
+
+  <!-- Modal Pengaturan Tata Letak Halaman -->
+  <div class="modal-backdrop hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="settingsModalTitle">Pengaturan Tata Letak Halaman</h3>
+          <p>Atur urutan penggabungan dokumen di dalam setiap file <code>[KodeDealer]_Compile.pdf</code></p>
+        </div>
+        <button type="button" class="btn-icon-close" id="btnCloseSettings" aria-label="Tutup">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="order-list" id="orderListContainer"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" id="btnResetOrder">Reset Default</button>
+        <div class="modal-footer-right">
+          <button type="button" class="btn-secondary" id="btnCancelSettings">Batal</button>
+          <button type="button" class="btn-primary" id="btnSaveSettings">Simpan Pengaturan</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
